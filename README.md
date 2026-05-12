@@ -71,3 +71,79 @@ pyinstaller --onefile --noconsole ^
 The executable will be at `dist\PDFTextReplacer.exe`.
 
 > **Note:** PyInstaller builds are platform-specific. You must run the Windows build on a Windows machine and the macOS build on a Mac.
+
+---
+
+# PDF Text Replacer — Español
+
+App de escritorio para buscar y reemplazar texto en varios archivos PDF conservando la fuente, tamaño, color y posición original del texto reemplazado.
+
+## Ejecutar desde el código fuente
+
+**Requisitos:** Python 3.10+
+
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/itrejomx/replace-text-pdf.git
+cd replace-text-pdf
+
+# 2. Crear y activar un entorno virtual
+python -m venv venv
+source venv/bin/activate        # macOS / Linux
+# venv\Scripts\activate         # Windows
+
+# 3. Instalar dependencias
+pip install -r requirements.txt
+
+# 4. Iniciar la app
+python main.py
+```
+
+## Compilar una app nativa en macOS
+
+Ejecuta el script incluido — genera un binario en `dist/PDFTextReplacer`:
+
+```bash
+# Asegúrate de tener el venv creado con las dependencias instaladas (ver arriba)
+./build.sh
+```
+
+El binario en `dist/PDFTextReplacer` se puede mover a cualquier carpeta y ejecutar sin tener Python instalado.
+
+Para empaquetarlo como un bundle `.app` que puedas poner en `/Applications`, usa PyInstaller directamente:
+
+```bash
+source venv/bin/activate
+pip install pyinstaller
+
+pyinstaller --onefile --windowed \
+  --hidden-import fitz \
+  --hidden-import customtkinter \
+  --collect-all customtkinter \
+  --name "PDFTextReplacer" \
+  main.py
+```
+
+El bundle quedará en `dist/PDFTextReplacer.app`.
+
+## Compilar un EXE en Windows
+
+Ejecuta lo siguiente en una ventana de Símbolo del sistema o PowerShell desde la carpeta del proyecto:
+
+```bat
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+pip install pyinstaller
+
+pyinstaller --onefile --noconsole ^
+  --hidden-import fitz ^
+  --hidden-import customtkinter ^
+  --collect-all customtkinter ^
+  --name "PDFTextReplacer" ^
+  main.py
+```
+
+El ejecutable quedará en `dist\PDFTextReplacer.exe`.
+
+> **Nota:** Los binarios generados con PyInstaller son específicos de cada plataforma. El build de Windows hay que hacerlo en Windows y el de macOS en una Mac.
