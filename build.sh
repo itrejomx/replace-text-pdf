@@ -15,6 +15,8 @@ pip install -q pyinstaller>=6.0.0
 
 pyinstaller --onefile --noconsole \
   --hidden-import fitz \
+  --hidden-import customtkinter \
+  --collect-all customtkinter \
   --name "PDFTextReplacer" \
   main.py
 

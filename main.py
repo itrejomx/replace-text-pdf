@@ -1,123 +1,131 @@
 import os
 import threading
-import tkinter as tk
+
+import customtkinter as ctk
 from tkinter import filedialog, messagebox
-from tkinter import ttk
 
 from pdf_processor import process_pdf
 
+ctk.set_appearance_mode("System")
+ctk.set_default_color_theme("blue")
 
-class App:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("PDF Text Replacer")
-        self.root.geometry("600x500")
-        self.root.resizable(True, True)
 
-        self.folder_path = tk.StringVar()
-        self.pdf_files = []
-        self.check_vars = []
-        self.processing = False
+class App(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("PDF Text Replacer")
+        self.geometry("680x560")
+        self.minsize(560, 460)
+
+        self.folder_path = ctk.StringVar()
+        self.search_var = ctk.StringVar()
+        self.replace_var = ctk.StringVar()
+        self.status_var = ctk.StringVar(value="Ready")
+        self.file_count_var = ctk.StringVar(value="No folder selected")
+        self.select_all_var = ctk.BooleanVar(value=True)
+
+        self.pdf_files: list[str] = []
+        self.check_vars: list[ctk.BooleanVar] = []
 
         self._build_ui()
 
     def _build_ui(self):
-        main_frame = ttk.Frame(self.root, padding=10)
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(3, weight=1)
 
-        # Folder selection
-        folder_frame = ttk.Frame(main_frame)
-        folder_frame.pack(fill=tk.X, pady=(0, 10))
+        # ── Folder row ──────────────────────────────────────────────────────
+        folder_frame = ctk.CTkFrame(self, fg_color="transparent")
+        folder_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 8))
+        folder_frame.grid_columnconfigure(1, weight=1)
 
-        ttk.Label(folder_frame, text="Folder:").pack(side=tk.LEFT)
-        ttk.Entry(folder_frame, textvariable=self.folder_path, state="readonly").pack(
-            side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 5)
+        ctk.CTkLabel(folder_frame, text="Folder:", width=90, anchor="w").grid(
+            row=0, column=0, padx=(0, 8)
         )
-        ttk.Button(folder_frame, text="Browse...", command=self._browse_folder).pack(
-            side=tk.RIGHT
+        ctk.CTkEntry(
+            folder_frame, textvariable=self.folder_path, state="disabled"
+        ).grid(row=0, column=1, sticky="ew", padx=(0, 8))
+        ctk.CTkButton(
+            folder_frame, text="Browse…", width=90, command=self._browse_folder
+        ).grid(row=0, column=2)
+
+        # ── Search / Replace ────────────────────────────────────────────────
+        inputs_frame = ctk.CTkFrame(self, fg_color="transparent")
+        inputs_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 8))
+        inputs_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(inputs_frame, text="Search for:", width=90, anchor="w").grid(
+            row=0, column=0, padx=(0, 8), pady=(0, 6)
+        )
+        ctk.CTkEntry(inputs_frame, textvariable=self.search_var).grid(
+            row=0, column=1, sticky="ew", pady=(0, 6)
         )
 
-        # Search/Replace inputs
-        input_frame = ttk.Frame(main_frame)
-        input_frame.pack(fill=tk.X, pady=(0, 10))
-
-        ttk.Label(input_frame, text="Search for:").grid(
-            row=0, column=0, sticky=tk.W, pady=2
+        ctk.CTkLabel(inputs_frame, text="Replace with:", width=90, anchor="w").grid(
+            row=1, column=0, padx=(0, 8)
         )
-        self.search_var = tk.StringVar()
-        ttk.Entry(input_frame, textvariable=self.search_var).grid(
-            row=0, column=1, sticky=tk.EW, pady=2, padx=(5, 0)
+        ctk.CTkEntry(inputs_frame, textvariable=self.replace_var).grid(
+            row=1, column=1, sticky="ew"
         )
 
-        ttk.Label(input_frame, text="Replace with:").grid(
-            row=1, column=0, sticky=tk.W, pady=2
-        )
-        self.replace_var = tk.StringVar()
-        ttk.Entry(input_frame, textvariable=self.replace_var).grid(
-            row=1, column=1, sticky=tk.EW, pady=2, padx=(5, 0)
-        )
-        input_frame.columnconfigure(1, weight=1)
+        # ── File list ───────────────────────────────────────────────────────
+        list_outer = ctk.CTkFrame(self)
+        list_outer.grid(row=3, column=0, sticky="nsew", padx=20, pady=(0, 8))
+        list_outer.grid_columnconfigure(0, weight=1)
+        list_outer.grid_rowconfigure(1, weight=1)
 
-        # File list
-        list_frame = ttk.Frame(main_frame)
-        list_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        list_header = ctk.CTkFrame(list_outer, fg_color="transparent")
+        list_header.grid(row=0, column=0, sticky="ew", padx=12, pady=(8, 4))
+        list_header.grid_columnconfigure(0, weight=1)
 
-        list_header = ttk.Frame(list_frame)
-        list_header.pack(fill=tk.X)
-
-        self.select_all_var = tk.BooleanVar()
-        ttk.Checkbutton(
+        ctk.CTkCheckBox(
             list_header,
             text="Select All",
             variable=self.select_all_var,
             command=self._toggle_select_all,
-        ).pack(side=tk.LEFT)
-
-        self.file_count_var = tk.StringVar(value="No folder selected")
-        ttk.Label(list_header, textvariable=self.file_count_var).pack(side=tk.RIGHT)
-
-        list_canvas = tk.Canvas(list_frame, borderwidth=0, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(
-            list_frame, orient="vertical", command=list_canvas.yview
+        ).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(list_header, textvariable=self.file_count_var).grid(
+            row=0, column=1, sticky="e"
         )
-        self.file_list_frame = ttk.Frame(list_canvas)
 
-        self.file_list_frame.bind(
-            "<Configure>",
-            lambda e: list_canvas.configure(scrollregion=list_canvas.bbox("all")),
+        self.scroll_frame = ctk.CTkScrollableFrame(list_outer, label_text="")
+        self.scroll_frame.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
+        self.scroll_frame.grid_columnconfigure(0, weight=1)
+
+        # ── Action buttons ──────────────────────────────────────────────────
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.grid(row=4, column=0, sticky="ew", padx=20, pady=(0, 8))
+
+        self.process_btn = ctk.CTkButton(
+            btn_frame,
+            text="Process Selected",
+            command=lambda: self._process(False),
         )
-        list_canvas.create_window((0, 0), window=self.file_list_frame, anchor="nw")
-        list_canvas.configure(yscrollcommand=scrollbar.set)
+        self.process_btn.pack(side="left", padx=(0, 8))
 
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        list_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        # Buttons
-        btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(fill=tk.X, pady=(0, 10))
-
-        self.process_btn = ttk.Button(
-            btn_frame, text="Process Selected", command=lambda: self._process(False)
+        self.process_all_btn = ctk.CTkButton(
+            btn_frame,
+            text="Process All",
+            command=lambda: self._process(True),
         )
-        self.process_btn.pack(side=tk.LEFT, padx=(0, 5))
+        self.process_all_btn.pack(side="left")
 
-        self.process_all_btn = ttk.Button(
-            btn_frame, text="Process All", command=lambda: self._process(True)
+        # ── Progress ─────────────────────────────────────────────────────────
+        progress_frame = ctk.CTkFrame(self, fg_color="transparent")
+        progress_frame.grid(row=5, column=0, sticky="ew", padx=20, pady=(0, 20))
+        progress_frame.grid_columnconfigure(0, weight=1)
+
+        self.progress = ctk.CTkProgressBar(progress_frame)
+        self.progress.set(0)
+        self.progress.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+
+        ctk.CTkLabel(progress_frame, textvariable=self.status_var, anchor="w").grid(
+            row=1, column=0, sticky="w"
         )
-        self.process_all_btn.pack(side=tk.LEFT, padx=(0, 5))
 
-        # Progress
-        progress_frame = ttk.Frame(main_frame)
-        progress_frame.pack(fill=tk.X)
-
-        self.progress = ttk.Progressbar(progress_frame, mode="determinate")
-        self.progress.pack(fill=tk.X, pady=(0, 5))
-
-        self.status_var = tk.StringVar(value="Ready")
-        ttk.Label(progress_frame, textvariable=self.status_var).pack(side=tk.LEFT)
+    # ── Logic ────────────────────────────────────────────────────────────────
 
     def _browse_folder(self):
-        folder = filedialog.askdirectory()
+        folder = filedialog.askdirectory(initialdir=os.getcwd())
         if folder:
             self.folder_path.set(folder)
             self._scan_folder()
@@ -132,20 +140,22 @@ class App:
         )
         self.check_vars = []
 
-        for widget in self.file_list_frame.winfo_children():
+        for widget in self.scroll_frame.winfo_children():
             widget.destroy()
 
         if not self.pdf_files:
-            ttk.Label(self.file_list_frame, text="No PDF files found.").pack(pady=10)
+            ctk.CTkLabel(self.scroll_frame, text="No PDF files found.").grid(
+                row=0, column=0, pady=10
+            )
             self.file_count_var.set("0 files")
             return
 
-        for pdf_file in self.pdf_files:
-            var = tk.BooleanVar(value=True)
+        for i, pdf_file in enumerate(self.pdf_files):
+            var = ctk.BooleanVar(value=True)
             self.check_vars.append(var)
-            ttk.Checkbutton(self.file_list_frame, text=pdf_file, variable=var).pack(
-                anchor=tk.W, fill=tk.X
-            )
+            ctk.CTkCheckBox(
+                self.scroll_frame, text=pdf_file, variable=var
+            ).grid(row=i, column=0, sticky="w", pady=2)
 
         self.file_count_var.set(f"{len(self.pdf_files)} file(s)")
 
@@ -154,92 +164,76 @@ class App:
         for var in self.check_vars:
             var.set(state)
 
-    def _process(self, process_all):
+    def _process(self, process_all: bool):
         if not self.folder_path.get():
             messagebox.showwarning("No Folder", "Please select a folder first.")
             return
-
         if not self.search_var.get():
             messagebox.showwarning("No Search Text", "Please enter text to search for.")
             return
-
         if not self.pdf_files:
-            messagebox.showwarning(
-                "No Files", "No PDF files found in the selected folder."
-            )
+            messagebox.showwarning("No Files", "No PDF files found in the selected folder.")
             return
 
-        if process_all:
-            selected = self.pdf_files[:]
-        else:
-            selected = [f for f, v in zip(self.pdf_files, self.check_vars) if v.get()]
+        selected = (
+            self.pdf_files[:]
+            if process_all
+            else [f for f, v in zip(self.pdf_files, self.check_vars) if v.get()]
+        )
 
         if not selected:
             messagebox.showwarning("No Selection", "No files selected for processing.")
             return
 
-        self.processing = True
-        self.process_btn.config(state=tk.DISABLED)
-        self.process_all_btn.config(state=tk.DISABLED)
+        self.process_btn.configure(state="disabled")
+        self.process_all_btn.configure(state="disabled")
+        self.progress.set(0)
 
-        thread = threading.Thread(
+        threading.Thread(
             target=self._process_files, args=(selected,), daemon=True
-        )
-        thread.start()
+        ).start()
 
-    def _process_files(self, selected):
+    def _process_files(self, selected: list[str]):
         folder = self.folder_path.get()
         search_text = self.search_var.get()
         replace_text = self.replace_var.get()
         total = len(selected)
         total_replacements = 0
-        errors = []
+        errors: list[str] = []
 
         for i, pdf_file in enumerate(selected):
-            self.root.after(
-                0, self._update_progress, i / total * 100, f"Processing {pdf_file}..."
+            self.after(
+                0, self._update_progress, i / total, f"Processing {pdf_file}…"
             )
-
             try:
-                input_path = os.path.join(folder, pdf_file)
-                output_path, count = process_pdf(input_path, search_text, replace_text)
+                _, count = process_pdf(
+                    os.path.join(folder, pdf_file), search_text, replace_text
+                )
                 total_replacements += count
             except Exception as e:
-                errors.append(f"{pdf_file}: {str(e)}")
+                errors.append(f"{pdf_file}: {e}")
 
-        self.root.after(
-            0,
-            self._finish_processing,
-            total,
-            total_replacements,
-            errors,
-        )
+        self.after(0, self._finish_processing, total, total_replacements, errors)
 
-    def _update_progress(self, percent, status):
-        self.progress["value"] = percent
+    def _update_progress(self, value: float, status: str):
+        self.progress.set(value)
         self.status_var.set(status)
 
-    def _finish_processing(self, total, total_replacements, errors):
-        self.processing = False
-        self.process_btn.config(state=tk.NORMAL)
-        self.process_all_btn.config(state=tk.NORMAL)
-        self.progress["value"] = 100
+    def _finish_processing(self, total: int, total_replacements: int, errors: list[str]):
+        self.process_btn.configure(state="normal")
+        self.process_all_btn.configure(state="normal")
+        self.progress.set(1)
 
         msg = f"Processed {total} file(s). {total_replacements} replacement(s) made."
         if errors:
             msg += f"\n\nErrors ({len(errors)}):\n" + "\n".join(errors)
-            self.status_var.set(f"Done with errors")
+            self.status_var.set("Done with errors")
         else:
             self.status_var.set("Done!")
 
         messagebox.showinfo("Complete", msg)
 
 
-def main():
-    root = tk.Tk()
-    App(root)
-    root.mainloop()
-
-
 if __name__ == "__main__":
-    main()
+    app = App()
+    app.mainloop()
